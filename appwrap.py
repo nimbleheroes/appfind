@@ -16,7 +16,8 @@ __CONTEXT_SETTINGS = {
 @click.command(context_settings=__CONTEXT_SETTINGS)
 @click.option("--run-version", default="latest", help="Version of this application to run.")
 @click.option("--list-versions", is_flag=True, help="Lists all available versions.")
-def main(run_version, list_versions):
+@click.option("--list-templates", is_flag=True, help="Lists all seach templates.")
+def main(run_version, list_versions, list_templates):
 
     exec_templates_str = os.getenv("APPWRAP_EXEC_TEMPLATES")
 
@@ -31,6 +32,11 @@ def main(run_version, list_versions):
         matches = glob_and_match(exec_templates)
         matches = sorted(matches, key=operator.itemgetter('version'), reverse=True)
 
+        if list_templates:
+            for template in exec_templates:
+                click.echo(f"{template}")
+            return
+
         if list_versions:
             for match in matches:
                 click.echo(f"{match['version']}")
@@ -38,8 +44,13 @@ def main(run_version, list_versions):
 
         if run_version is "latest":
             match = matches[0]
-            click.echo(f"{match['version']}: {match['exec_path']}")
-            click.echo(click.get_current_context().args)
+        elif run_version:
+            match = next((sub for sub in matches if sub['version'] == run_version), None)
+            if not match:
+                click.echo(f"No version found matching {run_version}")
+                return
+        click.echo(f"{match['version']}: {match['exec_path']}")
+        click.echo(f"Extra args: {click.get_current_context().args}")
 
 
 def glob_and_match(exec_templates):
