@@ -1,0 +1,7 @@
+#!/bin/sh
+exec_templates=(
+  "/Applications/Houdini/Houdini[{major}.{minor}.{release}]/Houdini FX {major}.{minor}.{release}.app/Contents/MacOS/houdini"
+)
+IFS=: # sets the internal field seperator to ':'
+export APPWRAP_EXEC_TEMPLATES="${exec_templates[*]}"
+python3 appwrap.py "$@"

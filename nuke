@@ -1,0 +1,9 @@
+#!/bin/sh
+exec_templates=(
+  "/Applications/Nuke[{major}.{minor}v{release}]/Nuke{major}.{minor}v{release}.app/Contents/MacOS/Nuke{major}.{minor}"
+  "/Applications/Nuke[{major}.{minor}v{release}]/Nuke{major}.{minor}v{release}.app/Contents/MacOS/Nuke{major}.{minor}v{release}"
+  "/Applications/Nuke[{major}.{minor}v{release}.Beta{beta}]/Nuke{major}.{minor}v{release}.Beta{beta}.app/Contents/MacOS/Nuke{major}.{minor}"
+)
+IFS=: # sets the internal field seperator to ':'
+export APPWRAP_EXEC_TEMPLATES="${exec_templates[*]}"
+python3 appwrap.py "$@"
