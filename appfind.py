@@ -161,7 +161,9 @@ def launch_command(ctx, appver, apphelp):
 
 
 @cli.command("list",
-             short_help='list the found versions'
+             short_help='list the found versions',
+             context_settings={"ignore_unknown_options": True,
+                               "allow_extra_args": True}
              )
 @click.option("paths",
               "--paths",
