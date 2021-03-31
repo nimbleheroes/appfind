@@ -1,11 +1,14 @@
 import os
 import re
 import sys
+import copy
 import glob
 import operator
 import subprocess
 
 import click
+from tabulate import tabulate
+
 from click_default_group import DefaultGroup
 
 
@@ -43,11 +46,26 @@ from click_default_group import DefaultGroup
                    'alpha:beta:dev'
                    """.format(os.pathsep)
               )
+@click.option("tsort",
+              "--tsort",
+              envvar="APPFIND_TOKEN_SORT",
+              multiple=True,
+              type=click.Path(),
+              help="""This optional field specifies the order preference in which
+              tokens will be used to sort versions. Can be passed via the
+              APPFIND_TOKEN_SORT environment variable. This can be useful if an
+              app developer decides to change thier versioning from {{major}}.{{minor}}
+              to {{year}}.{{month}}. If you wanted the {{year}}.{{month}} scheme
+              to be the latest, you would set the it to something like this:\n
+              'year:month:major:minor'
+              If this option is not used, sorting will default to version name.
+              """.format(os.pathsep)
+              )
 @click.pass_context
 ###############################################################################
 # Main entry point
 ###############################################################################
-def cli(ctx, templates, prtokens):
+def cli(ctx, templates, prtokens, tsort):
     """A universal app finder and wrapper. Finds multiple versions of the same
     application on disk from using provided templates. Launches the latest
     version of the application by default."""
@@ -60,7 +78,7 @@ def cli(ctx, templates, prtokens):
     #     click.echo(f"No path templates found.")
     #     return
 
-    matches = _glob_and_match(templates, prtokens)
+    matches = _glob_and_match(click, templates, prtokens, tsort)
 
     if not matches:
         raise click.ClickException("No executables found matching templates.")
@@ -102,29 +120,24 @@ def launch_command(ctx, appver, apphelp):
 
     matches = ctx.obj["matches"]
 
-    if appver == "latest":
-        match = matches[0]
-    elif appver:
+    match = next((x for x in matches if appver in (x.get('tags') if x.get('tags') else [])), None)
+    if not match:
         match = next((x for x in matches if x['version'] == appver), None)
-        if not match:
-            raise click.ClickException(f"No version found matching {appver}")
+    elif not match:
+        raise click.ClickException(f"No version found matching '{appver}'")
 
     extra_args = click.get_current_context().args
 
     if apphelp:
         extra_args.insert(0, "--help")
-    # if extra_args and apphelp:
-    #     extra_args.insert(0, "--help")
-    # elif not extra_args and apphelp:
-    #     extra_args = ["--help"]
 
-    cmd = [match['exec_path']]
+    cmd = [match['path']]
 
     if extra_args:
         cmd.extend(extra_args)
 
-    click.echo(f"Command: {cmd}")
-    # subprocess.call(cmd)
+    click.echo(f"Launching: {' '.join(cmd)}")
+    subprocess.call(cmd)
 
 
 @cli.command("list",
@@ -141,18 +154,24 @@ def launch_command(ctx, appver, apphelp):
 ###############################################################################
 def list_command(ctx, paths):
     """Lists the versions found by appfind."""
-    # click.echo(ctx.obj)
+
     matches = ctx.obj["matches"]
 
-    for match in matches:
-        if paths:
-            click.echo(match["exec_path"])
-        else:
-            click.echo(match["version"])
+    tags_col = [", ".join(m["tags"]) if m.get("tags") else None for m in matches]
+    versions_col = [m["version"] for m in matches]
+    paths_col = [m["path"] for m in matches]
+
+    table_dict = {"tags": tags_col, "version": versions_col}
+    if paths:
+        table_dict["path"] = paths_col
+
+    click.echo(tabulate(table_dict, headers="keys"))
 
 
-def _glob_and_match(templates, prtokens):
+def _glob_and_match(click, templates, prtokens, tsort):
 
+    tokens = []  # this will be a list of all the tokens found in the templates
+    tdicts = []  # a list of dicts with template information
     app_matches = []
 
     for template in templates:
@@ -160,26 +179,39 @@ def _glob_and_match(templates, prtokens):
         if "[" in template and "]" in template:
             version_regex = re.compile(r".*\[(?P<version>.*)\].*")
             match = version_regex.match(template)
-            ver_template = match.group('version')
-            template = template.replace("[", "").replace("]", "")
-            template = os.path.abspath(os.path.expanduser(template))
+            tversion = match.group('version')
+            tpath = template.replace("[", "").replace("]", "")
+            tpath = os.path.abspath(os.path.expanduser(tpath))
         else:
-            print("Error: must capture the version string in the template with brackets!")
+            raise click.ClickException("Error: must capture the version string in the template with brackets!")
+
+        tdict = {"tpath": tpath, "tversion": tversion}
+        tdicts.append(tdict)
 
         token_regex = re.compile(r"\{([a-z]*)\}")
         token_matches = token_regex.findall(template)
-        tokens = list(set(token_matches))
+        tokens = tokens + list(set(token_matches) - set(tokens))
+
+    # print(tokens)
+    # print(tdicts)
+
+    app_match_template = {tk: int(0) for tk in tokens}
+    # print(app_match_template)
+    app_matches = []
+
+    for tdict in tdicts:
 
         glob_pattern = _format(
-            template, dict((key, "*") for key in tokens)
+            tdict["tpath"], dict((key, "*") for key in tokens)
         )
 
-        # print(glob_pattern)
-        matching_paths = glob.glob(glob_pattern)
-        # print(matching_paths)
+        globs = glob.glob(glob_pattern)
+        # print(globs)
+
+        # tdict["globs"] = globs
 
         exec_regex_pattern = _format(
-            template,
+            tdict["tpath"],
             # Put () around the provided expressions so that they become capture groups.
             dict(
                 (key, [r"(?P=%s)" % key, r"(?P<%s>\d+)" % key]) for key in tokens
@@ -189,33 +221,54 @@ def _glob_and_match(templates, prtokens):
         # accumulate the software version objects to return. this will include
         # include the head/tail anchors in the regex
         exec_regex_pattern = "^%s$" % (exec_regex_pattern,)
-        # print(regex_pattern)
+        # print(exec_regex_pattern)
 
         # compile the regex
         exec_regex = re.compile(exec_regex_pattern, re.IGNORECASE)
         # print(exec_regex)
 
+        # tdict["exec_regex"] = exec_regex
+
+        # print(tdict)
         # iterate over each executable found for the glob pattern and find
         # matched components via the regex
-        for matching_path in matching_paths:
+        for glob_path in globs:
 
-            match = exec_regex.match(matching_path)
-
+            # print(glob_path)
+            match = exec_regex.match(glob_path)
+            # print(match)
             if not match:
                 continue
 
-            app_match = {'exec_path': matching_path}
+            token_matches = match.groupdict()  # get a dict of all token matches
+            token_matches = {k: int(v) for k, v in token_matches.items()}
+            version = tdict["tversion"].format(**token_matches)  # create the version
 
-            token_matches = match.groupdict()
-            version = ver_template.format(**token_matches)
-            token_matches['version'] = version
-
+            app_match = copy.copy(app_match_template)
+            app_match['path'] = glob_path
+            app_match['version'] = version
             app_match.update(token_matches)
             app_matches.append(app_match)
 
-    if app_matches:
-        # app_matches = sorted(app_matches, key=operator.itemgetter('year', 'major'), reverse=True)
+    if app_matches and tsort:
+        app_matches = sorted(app_matches, key=operator.itemgetter(*tsort), reverse=True)
+    elif app_matches:
         app_matches = sorted(app_matches, key=operator.itemgetter('version'), reverse=True)
+
+    found_latest = False
+    prtokens = list(prtokens)
+    for app_match in app_matches:
+        if found_latest and not prtokens:
+            break
+        app_match["tags"] = []
+        # tag the version item that doesnt have a prtoken as latest
+        if not found_latest and not any(x in prtokens for x in [k for k, v in app_match.items() if v is not 0]):
+            app_match["tags"].append('latest')
+            found_latest = True
+        # tag the fist versions we find with a prtoken
+        for prtoken in [k for k, v in app_match.items() if (v is not 0 and k in prtokens)]:
+            app_match["tags"].append(prtoken)
+            prtokens.pop(prtokens.index(prtoken))
 
     return app_matches
 
