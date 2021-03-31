@@ -1,3 +1,3 @@
-# appwrap
+# appfind
 
-A universal app wrapper
+A universal app finder and wrapper
