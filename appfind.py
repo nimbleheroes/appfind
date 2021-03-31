@@ -88,8 +88,10 @@ def cli(ctx, templates, prtokens, tsort, vdefault):
     # by means other than the `if` block below)
     ctx.ensure_object(dict)
 
-    prtokens = prtokens.split(os.pathsep)
-    tsort = tsort.split(os.pathsep)
+    if prtokens:
+        prtokens = prtokens.split(os.pathsep)
+    if tsort:
+        tsort = tsort.split(os.pathsep)
 
     matches = _glob_and_match(click, templates, prtokens, tsort, vdefault)
 
@@ -297,7 +299,6 @@ def _glob_and_match(click, templates, prtokens, tsort, vdefault):
 
     found_latest = False
     found_default = False
-    prtokens = list(prtokens)
     for app_match in app_matches:
         if found_latest and found_default and not prtokens:
             break
