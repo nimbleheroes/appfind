@@ -8,6 +8,6 @@ exec_templates=(
 )
 IFS=: # sets the internal field seperator to ':'
 export APPFIND_TEMPLATES="${exec_templates[*]}"
-export APPFIND_PR_TOKENS="beta:dev"
+export APPFIND_PR_TOKENS="beta"
 export APPFIND_TOKEN_SORT="major:year:minor:release:beta:dev"
 appfind "$@"
