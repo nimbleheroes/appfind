@@ -88,10 +88,8 @@ def cli(ctx, templates, prtokens, tsort, vdefault):
     # by means other than the `if` block below)
     ctx.ensure_object(dict)
 
-    if prtokens:
-        prtokens = prtokens.split(os.pathsep)
-    if tsort:
-        tsort = tsort.split(os.pathsep)
+    prtokens = (prtokens.split(os.pathsep) if prtokens else [])
+    tsort = (tsort.split(os.pathsep) if tsort else [])
 
     matches = _glob_and_match(click, templates, prtokens, tsort, vdefault)
 
