@@ -6,4 +6,4 @@ exec_templates=(
 )
 IFS=: # sets the internal field seperator to ':'
 export APPWRAP_EXEC_TEMPLATES="${exec_templates[*]}"
-python3 appwrap.py "$@"
+appwrap "$@"

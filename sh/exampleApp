@@ -1,0 +1,13 @@
+#!/bin/sh
+exec_templates=(
+  "/Users/anthony/Documents/gits/appfind/examples/application-[{year}.{minor}]/application"
+  "/Users/anthony/Documents/gits/appfind/examples/application[{major}.{minor}.{release}]/application{major}.{minor}"
+  "~/Documents/gits/appfind/examples/application[{major}.{minor}.{release}-beta{beta}]/application"
+  "~/Documents/gits/appfind/examples/application[{major}.{minor}.{release}]/application"
+  "~/Documents/gits/appfind/examples/application[{major}.{minor}.{release}-dev{dev}]/application"
+)
+IFS=: # sets the internal field seperator to ':'
+export APPFIND_TEMPLATES="${exec_templates[*]}"
+export APPFIND_PR_TOKENS="beta:dev"
+export APPFIND_TOKEN_SORT="year:major:minor:release:beta:dev"
+appfind "$@"

@@ -6,5 +6,6 @@ exec_templates=(
   "/Applications/Nuke[{major}.{minor}v{release}.Beta{beta}]/Nuke{major}.{minor}v{release}.Beta{beta}.app/Contents/MacOS/Nuke{major}.{minor}" # beta mac os style
 )
 IFS=: # sets the internal field seperator to ':'
-export APPWRAP_EXEC_TEMPLATES="${exec_templates[*]}"
-python3 appwrap.py "$@"
+export APPFIND_TEMPLATES="${exec_templates[*]}"
+export APPFIND_PR_TOKENS="beta"
+appfind "$@"
