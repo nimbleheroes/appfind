@@ -145,6 +145,8 @@ def launch_command(ctx, appver, apphelp):
 
     # store any unrecognized args
     extra_args = click.get_current_context().args
+    if ctx.obj.get("args"):
+        extra_args.extend(ctx.obj.get("args"))
 
     # if we get apphelp, pass a --help to the app since our --help overrides it
     if apphelp:
@@ -185,6 +187,9 @@ def list_command(ctx, paths, ask):
     """Lists the versions found by appfind."""
 
     matches = ctx.obj["matches"]
+
+    # store any unrecognized args
+    ctx.obj["args"] = click.get_current_context().args
 
     tags_col = [", ".join(m["tags"]) if m.get("tags") else None for m in matches]
     versions_col = [m["version"] for m in matches]
